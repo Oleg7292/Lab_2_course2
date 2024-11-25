@@ -1,36 +1,38 @@
 #include <iostream>
-using namespace std; 
+#include "Array.h"
+
+using namespace std;
 
 // Функция для генерации и вывода всех комбинаций элементов массива
-void combination(int* arr, int size)
-{
-    if (size > 32) return;
+void combination(const Array& arr) {
+    if (arr.length > 32) return; // Ограничение на размер
 
     cout << '[';
 
-    // Цикл по всем возможным подмножествам (2^size)
-    for (int i = 0; i < (1 << size); i++) { // 1 << size = 2^size, перебираем все подмножества
+    // Цикл по всем возможным подмножествам (2^length)
+    for (size_t i = 0; i < (1 << arr.length); i++) { // 1 << length = 2^length
         cout << '{';
 
         bool first = true; // Флаг для отслеживания первой итерации
-        for (int l = 0; l < size; l++) {
+        for (size_t l = 0; l < arr.length; l++) {
             if ((i >> l) & 1) { // Проверка, установлен ли l-й бит в числе i
                 if (!first) cout << ',';
-                cout << arr[l]; 
+                cout << arr.get(l);
                 first = false;
             }
         }
 
         cout << '}';
-        if (i < (1 << size) - 1) cout << ','; 
+        if (i < (1 << arr.length) - 1) cout << ',';
     }
 
-    cout << ']'; 
+    cout << ']';
 }
 
-int main()
-{
-    int size_x; // Размер массива
+int main() {
+    Array arr;
+    size_t size_x;
+
     cout << "Введите количество элементов в массиве: ";
     cin >> size_x;
 
@@ -39,14 +41,17 @@ int main()
         return 1;
     }
 
-    int* x = new int[size_x]; // Динамическое выделение памяти для массива
+    arr.initialize(size_x);
+
     cout << "Введите элементы массива: ";
-    for (int i = 0; i < size_x; i++) {
-        cin >> x[i];
+    for (size_t i = 0; i < size_x; i++) {
+        string value;
+        cin >> value;
+        arr.add(value);
     }
 
-    combination(x, size_x);
+    combination(arr);
 
-    delete[] x; 
+    arr.cleanup(); // Освобождение памяти
     return 0;
 }

@@ -1,137 +1,215 @@
 #include <iostream>
+#include <string>
 #include <cstring>
+#include <cstdlib>
 
 using namespace std;
 
-// Функция для печати всех подмножеств
-void printSubsets(int** subsets, int* subsetSizes, int k) {
-    for (int i = 0; i < k; ++i) {
-        cout << "{ ";
-        for (int j = 0; j < subsetSizes[i]; ++j) {
-            cout << subsets[i][j] << " ";
-        }
-        cout << "}\n";
-    }
-}
+struct HashSet {
+    struct Node {
+        string value;
+        Node* next;
 
-// Рекурсивная функция для разбиения множества на подмножества
-bool canPartition(int* arr, int n, int k, int** subsets, int* subsetSizes, bool* used, int subsetSum, int targetSum, int index) {
-    // Если осталось одно подмножество, заполняем его оставшимися элементами
-    if (k == 1) {
-        int subsetIndex = 0;
-        for (int i = 0; i < n; ++i) {
-            if (!used[i]) {
-                subsets[0][subsetIndex++] = arr[i];
+        Node(const string& val) : value(val), next(nullptr) {}
+    };
+
+    Node** table;
+    size_t capacity;
+    size_t size;
+
+    HashSet(size_t initialCapacity = 1024)
+        : capacity(initialCapacity), size(0) {
+        table = (Node**)malloc(sizeof(Node*) * capacity);
+        memset(table, 0, sizeof(Node*) * capacity);
+    }
+
+    ~HashSet() {
+        for (size_t i = 0; i < capacity; ++i) {
+            Node* current = table[i];
+            while (current) {
+                Node* toDelete = current;
+                current = current->next;
+                delete toDelete;
             }
         }
-        subsetSizes[0] = subsetIndex;
+        free(table);
+    }
+
+    size_t hash(const string& key) const {
+        size_t hashValue = 0;
+        for (char ch : key) {
+            hashValue = (hashValue * 31 + ch) % capacity;
+        }
+        return hashValue;
+    }
+
+    void Add(const string& value) {
+        size_t index = hash(value);
+        Node* current = table[index];
+        while (current) {
+            if (current->value == value) {
+                return;
+            }
+            current = current->next;
+        }
+        Node* newNode = new Node(value);
+        newNode->next = table[index];
+        table[index] = newNode;
+        ++size;
+    }
+
+    bool Remove(const string& value) {
+        size_t index = hash(value);
+        Node* current = table[index];
+        Node* prev = nullptr;
+
+        while (current) {
+            if (current->value == value) {
+                if (prev) {
+                    prev->next = current->next;
+                } else {
+                    table[index] = current->next;
+                }
+                delete current;
+                --size;
+                return true;
+            }
+            prev = current;
+            current = current->next;
+        }
+        return false;
+    }
+
+    bool Contains(const string& value) const {
+        size_t index = hash(value);
+        Node* current = table[index];
+        while (current) {
+            if (current->value == value) {
+                return true;
+            }
+            current = current->next;
+        }
+        return false;
+    }
+
+    void Print() const {
+        for (size_t i = 0; i < capacity; ++i) {
+            Node* current = table[i];
+            while (current) {
+                cout << current->value << " ";
+                current = current->next;
+            }
+        }
+        cout << endl;
+    }
+
+    int Sum() const {
+        int total = 0;
+        for (size_t i = 0; i < capacity; ++i) {
+            Node* current = table[i];
+            while (current) {
+                total += stoi(current->value);
+                current = current->next;
+            }
+        }
+        return total;
+    }
+
+    // Копирует все элементы множества в массив
+    int ExtractElements(int* arr) const {
+        int index = 0;
+        for (size_t i = 0; i < capacity; ++i) {
+            Node* current = table[i];
+            while (current) {
+                arr[index++] = stoi(current->value);
+                current = current->next;
+            }
+        }
+        return index;
+    }
+};
+
+// Рекурсивная функция для поиска подмножества
+bool findSubset(int* arr, int n, bool* used, int targetSum, int currentSum, HashSet& subset) {
+    if (currentSum == targetSum) {
         return true;
     }
 
-    // Если текущее подмножество достигло целевой суммы, начинаем формировать следующее
-    if (subsetSum == targetSum) {
-        return canPartition(arr, n, k - 1, subsets + 1, subsetSizes + 1, used, 0, targetSum, 0);
-    }
-
-    // Перебираем элементы множества, чтобы сформировать текущее подмножество
-    for (int i = index; i < n; ++i) {
-        if (!used[i] && subsetSum + arr[i] <= targetSum) {
-            // Отмечаем текущий элемент как использованный
+    for (int i = 0; i < n; ++i) {
+        if (!used[i] && currentSum + arr[i] <= targetSum) {
             used[i] = true;
-            subsets[0][subsetSizes[0]++] = arr[i];
+            subset.Add(to_string(arr[i]));
 
-            // Рекурсивно продолжаем формировать подмножество
-            if (canPartition(arr, n, k, subsets, subsetSizes, used, subsetSum + arr[i], targetSum, i + 1)) {
+            if (findSubset(arr, n, used, targetSum, currentSum + arr[i], subset)) {
                 return true;
             }
 
-            // Откатываем изменения, если текущий путь не привел к решению
+            // Backtrack
             used[i] = false;
-            --subsetSizes[0];
+            subset.Remove(to_string(arr[i]));
         }
     }
 
-    // Если не удалось сформировать подмножество, возвращаем false
     return false;
 }
-
-// Функция для поиска всех возможных разбиений множества
-void findAllPartitions(int* arr, int n) {
-    int totalSum = 0;
-
-    // Считаем общую сумму элементов множества
-    for (int i = 0; i < n; ++i) {
-        totalSum += arr[i];
+void divideSet(HashSet& set, int k) {
+    int totalSum = set.Sum();
+    if (totalSum % k != 0) {
+        cout << "Cannot divide the set into " << k << " subsets with equal sum." << endl;
+        return;
     }
 
-    bool found = false;
+    int targetSum = totalSum / k;
+    int* arr = new int[set.size];
+    bool* used = new bool[set.size];
+    memset(used, 0, sizeof(bool) * set.size);
 
-    // Перебираем все возможные количества подмножеств (от 1 до n)
-    for (int k = 1; k <= n; ++k) {
-        // Если сумма множества не делится на k, пропускаем
-        if (totalSum % k != 0) continue;
+    set.ExtractElements(arr);
 
-        int targetSum = totalSum / k; // Целевая сумма для каждого подмножества
+    for (int i = 0; i < k; ++i) {
+        HashSet subset;
+        if (!findSubset(arr, set.size, used, targetSum, 0, subset)) {
+            cout << "Cannot divide the set into " << k << " subsets with equal sum." << endl;
+            delete[] arr;
+            delete[] used;
 
-        // Динамическое выделение памяти для подмножеств и вспомогательных данных
-        int** subsets = new int*[k];
-        int* subsetSizes = new int[k];
-        bool* used = new bool[n];
-
-        for (int i = 0; i < k; ++i) {
-            subsets[i] = new int[n];
-            subsetSizes[i] = 0;
-        }
-        memset(used, false, n * sizeof(bool));
-
-        // Проверяем, можно ли разбить множество на k подмножеств
-        if (canPartition(arr, n, k, subsets, subsetSizes, used, 0, targetSum, 0)) {
-            cout << "Разбиение множества на " << k << " подмножества с суммой " << targetSum << ":\n";
-            printSubsets(subsets, subsetSizes, k);
-            found = true;
+            // Прерываем проверку для большего k
+            throw false; // Исключение для быстрого выхода
         }
 
-        // Освобождаем выделенную память
-        for (int i = 0; i < k; ++i) {
-            delete[] subsets[i];
-        }
-        delete[] subsets;
-        delete[] subsetSizes;
-        delete[] used;
+        cout << "Subset " << i + 1 << ": ";
+        subset.Print();
     }
 
-    // Если разбиение не найдено, выводим сообщение
-    if (!found) {
-        cout << "Множество нельзя разбить на подмножества с равной суммой.\n";
-    }
+    delete[] arr;
+    delete[] used;
 }
 
 int main() {
-    int n;
+    HashSet set;
 
-    // Ввод количества элементов множества
-    cout << "Введите количество элементов множества: ";
+    cout << "Enter the number of elements in the set: ";
+    int n;
     cin >> n;
 
-    // Динамическое выделение памяти для множества
-    int* arr = new int[n];
-
-    // Ввод элементов множества
-    cout << "Введите элементы множества:\n";
-    for (int i = 0; i < n; ++i) {
-        cin >> arr[i];
+    cout << "Enter the elements of the set (space-separated): ";
+    for (int i = 0; i < n; i++) {
+        int num;
+        cin >> num;
+        set.Add(to_string(num));
     }
 
-    // Вывод введенного множества
-    cout << "Множество: { ";
-    for (int i = 0; i < n; ++i) {
-        cout << arr[i] << " ";
-    }
-    cout << "}\n";
-    // Поиск всех возможных разбиений множества
-    findAllPartitions(arr, n);
+    cout << "Input set: ";
+    set.Print();
 
-    // Освобождение памяти
-    delete[] arr;
+    try {
+        for (int k = 2; k <= n; ++k) {
+            cout << "\nTrying to divide into " << k << " subsets...\n";
+            divideSet(set, k);
+        }
+    } catch (bool) {
+        cout << "Stopped further checks since dividing into more subsets is impossible." << endl;
+    }
+
     return 0;
 }
